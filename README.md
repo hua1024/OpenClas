@@ -17,7 +17,7 @@
 
 
 
-###reference
+### reference
     1.https://github.com/PaddlePaddle/PaddleClas
     2.https://github.com/open-mmlab/mmclassification
     3.https://github.com/weiaicunzai/pytorch-cifar100
