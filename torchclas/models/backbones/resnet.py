@@ -5,7 +5,9 @@
 
 '''
 1.论文resnet结构，参考torchvision
-2.替换第一层7*7-->3个3*3
+2.相对于原论文的修改
+stride=2，放到第二个1x1卷积
+# 替换第一层7*7-->3个3*3，这个同步到resnet_vd重，resnet取消使用，感觉对于28*28的输入图片，第一个卷积7*7会太大
 resnet18 : [2, 2, 2, 2]
 resnet34 : [3, 4, 6, 3]
 resnet50 : [3, 4, 6, 3]
@@ -15,14 +17,17 @@ resnet152 : [3, 8, 36, 3]
 import torch
 import torch.nn as nn
 
+from ..builder import BACKBONES
+from .base_backbone import BaseBackbone
+
 __all__ = [
-    "ResNet", "resnet18", "resnet34", "resnet50", "resnet101",
-    "resnet152"
+    "ResNet"
 ]
 
 
 # conv+bn+relu
 class ConvBnRelu(nn.Module):
+
     def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, groups=1, is_relu=False):
         super(ConvBnRelu, self).__init__()
         self.conv = nn.Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=kernel_size,
@@ -66,17 +71,17 @@ class BasicBlock(nn.Module):
     def __init__(self, in_channels, out_channels, stride=1):
         super(BasicBlock, self).__init__()
 
-        self.conv0 = ConvBnRelu(in_channels=in_channels, out_channels=out_channels, kernel_size=3, stride=stride,
+        self.conv1 = ConvBnRelu(in_channels=in_channels, out_channels=out_channels, kernel_size=3, stride=stride,
                                 padding=1, is_relu=True)
-        self.conv1 = ConvBnRelu(in_channels=out_channels, out_channels=out_channels * BasicBlock.expansion,
+        self.conv2 = ConvBnRelu(in_channels=out_channels, out_channels=out_channels * BasicBlock.expansion,
                                 kernel_size=3, padding=1, stride=1, is_relu=False)
         self.shortcut = ShortCut(in_channels=in_channels, out_channels=out_channels * BasicBlock.expansion,
                                  stride=stride)
         self.relu = nn.ReLU()
 
     def forward(self, x):
-        y = self.conv0(x)
-        y = self.conv1(y)
+        y = self.conv1(x)
+        y = self.conv2(y)
         y = y + self.shortcut(x)
         return self.relu(y)
 
@@ -89,48 +94,50 @@ class BottleneckBlock(nn.Module):
 
     def __init__(self, in_channels, out_channels, stride):
         super(BottleneckBlock, self).__init__()
-        self.conv0 = ConvBnRelu(in_channels=in_channels, out_channels=out_channels, kernel_size=1, stride=1,
+        self.conv1 = ConvBnRelu(in_channels=in_channels, out_channels=out_channels, kernel_size=1, stride=1,
                                 padding=0, is_relu=True)
-        self.conv1 = ConvBnRelu(in_channels=out_channels, out_channels=out_channels, kernel_size=3, stride=stride,
+        self.conv2 = ConvBnRelu(in_channels=out_channels, out_channels=out_channels, kernel_size=3, stride=stride,
                                 padding=1, is_relu=True)
-        self.conv2 = ConvBnRelu(in_channels=out_channels, out_channels=out_channels * BottleneckBlock.expansion,
+        self.conv3 = ConvBnRelu(in_channels=out_channels, out_channels=out_channels * BottleneckBlock.expansion,
                                 kernel_size=1, stride=1, padding=0, is_relu=False)
         self.shortcut = ShortCut(in_channels=in_channels, out_channels=out_channels * BottleneckBlock.expansion,
                                  stride=stride)
         self.relu = nn.ReLU()
 
     def forward(self, x):
-        y = self.conv0(x)
-        y = self.conv1(y)
+        y = self.conv1(x)
         y = self.conv2(y)
+        y = self.conv3(y)
         y = y + self.shortcut(x)
         return self.relu(y)
 
 
-class ResNet(nn.Module):
-    def __init__(self, in_channels, block, num_block, is_3x3=False, num_classes=1000):
+@BACKBONES.register_module()
+class ResNet(BaseBackbone):
+    arch_settings = {
+        18: (BasicBlock, (2, 2, 2, 2)),
+        34: (BasicBlock, (3, 4, 6, 3)),
+        50: (BottleneckBlock, (3, 4, 6, 3)),
+        101: (BottleneckBlock, (3, 4, 23, 3)),
+        152: (BottleneckBlock, (3, 8, 36, 3))
+    }
+
+    def __init__(self, depth, in_channels, num_classes=1000):
         super(ResNet, self).__init__()
         self.in_channels = 64
-        if not is_3x3:
-            self.conv1 = ConvBnRelu(in_channels=in_channels, out_channels=64, kernel_size=7, padding=1, stride=2,
-                                    is_relu=True)
-        else:
-            self.conv1 = nn.Sequential(
-                ConvBnRelu(in_channels=in_channels, out_channels=32, kernel_size=3, stride=2, padding=1,
-                           is_relu=True),
-                ConvBnRelu(in_channels=32, out_channels=32, kernel_size=3, stride=1, padding=1,
-                           is_relu=True),
-                ConvBnRelu(in_channels=32, out_channels=self.in_channels, kernel_size=3, stride=1, padding=1,
-                           is_relu=True)
-            )
+        self.block = ResNet.arch_settings[depth][0]
+        self.num_block = ResNet.arch_settings[depth][1]
+        # padding = 3 才能输出原论文的112
+        self.conv1 = ConvBnRelu(in_channels=in_channels, out_channels=64, kernel_size=7, padding=3, stride=2,
+                                is_relu=True)
         self.pool1 = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
 
-        self.conv2_x = self._make_layer(block=block, out_channels=64, num_blocks=num_block[0], stride=1)
-        self.conv3_x = self._make_layer(block=block, out_channels=128, num_blocks=num_block[1], stride=2)
-        self.conv4_x = self._make_layer(block=block, out_channels=256, num_blocks=num_block[2], stride=2)
-        self.conv5_x = self._make_layer(block=block, out_channels=512, num_blocks=num_block[3], stride=2)
+        self.conv2_x = self._make_layer(block=self.block, out_channels=64, num_blocks=self.num_block[0], stride=1)
+        self.conv3_x = self._make_layer(block=self.block, out_channels=128, num_blocks=self.num_block[1], stride=2)
+        self.conv4_x = self._make_layer(block=self.block, out_channels=256, num_blocks=self.num_block[2], stride=2)
+        self.conv5_x = self._make_layer(block=self.block, out_channels=512, num_blocks=self.num_block[3], stride=2)
         self.avg_pool = nn.AdaptiveAvgPool2d((1, 1))
-        self.fc = nn.Linear(512 * block.expansion, num_classes)
+        self.fc = nn.Linear(512 * self.block.expansion, num_classes)
 
     def _make_layer(self, block, out_channels, num_blocks, stride):
         '''
@@ -156,38 +163,3 @@ class ResNet(nn.Module):
         out = out.view(out.size(0), -1)
         out = self.fc(out)
         return out
-
-
-def resnet18(in_channels, num_class, is_3x3=False):
-    """ return a ResNet 18 object
-    """
-    return ResNet(block=BasicBlock, in_channels=in_channels, num_block=[2, 2, 2, 2], num_classes=num_class,
-                  is_3x3=is_3x3)
-
-
-def resnet34(in_channels, num_class, is_3x3=False):
-    """ return a ResNet 34 object
-    """
-    return ResNet(block=BasicBlock, in_channels=in_channels, num_block=[3, 4, 6, 3], num_classes=num_class,
-                  is_3x3=is_3x3)
-
-
-def resnet50(in_channels, num_class, is_3x3=False):
-    """ return a ResNet 50 object
-    """
-    return ResNet(block=BottleneckBlock, in_channels=in_channels, num_block=[3, 4, 6, 3], num_classes=num_class,
-                  is_3x3=is_3x3)
-
-
-def resnet101(in_channels, num_class, is_3x3=False):
-    """ return a ResNet 101 object
-    """
-    return ResNet(block=BottleneckBlock, in_channels=in_channels, num_block=[3, 4, 23, 3], num_classes=num_class,
-                  is_3x3=is_3x3)
-
-
-def resnet152(in_channels, num_class, is_3x3=False):
-    """ return a ResNet 152 object
-    """
-    return ResNet(block=BottleneckBlock, in_channels=in_channels, num_block=[3, 8, 36, 3], num_classes=num_class,
-                  is_3x3=is_3x3)

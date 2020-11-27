@@ -4,8 +4,8 @@
 
 
 from .compose import Compose
-from .transforms import (Normalize, ToTensor,Resize)
+from .transforms import (Normalize, ToTensor, Resize, CenterCrop, RandomRotation)
 
 __all__ = [
-    'Compose', 'Normalize', 'ToTensor','Resize'
+    'Compose', 'Normalize', 'ToTensor', 'Resize', 'CenterCrop', 'RandomRotation',
 ]

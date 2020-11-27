@@ -1,12 +1,12 @@
 BASE:
-  gpu_id: '1'
+  gpu_id: '2'
   algorithm: Clas
   dataset_name: DogCat
   resume: False
-  resume_file: 'checkpoints/DogCat/Clas/ResNet/weights/bs_32_eps_40.pth'
+  resume_file: ''
   seed: 999
   n_epoch: 50
-  init_lr: 0.01
+  init_lr: 0.001
   start_val: 0
   show_step: 20
   checkpoints: ./checkpoints
@@ -19,10 +19,11 @@ BASE:
 
 
 BACKBONES:
-  type: ResNetVd
+  type: VGG
   in_channels: 3
   num_classes: 2
-  depth: 50
+  depth: 16
+  is_bn: True
 
 LR_SCHEDULER:
   type: 'StepLR'

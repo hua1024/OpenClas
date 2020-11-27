@@ -5,8 +5,6 @@
 import torch.nn as nn
 from ..builder import BACKBONES
 from .base_backbone import BaseBackbone
-import torch
-from torch.nn import functional as F
 
 
 @BACKBONES.register_module()
@@ -18,11 +16,11 @@ class LeNet5(BaseBackbone):
             nn.Conv2d(in_channel, 6, kernel_size=5, stride=1),
             nn.Tanh(),
             nn.AvgPool2d(kernel_size=2),
-            nn.Dropout(p=0.4),
+            # nn.Dropout(p=0.4),
             nn.Conv2d(6, 16, kernel_size=5, stride=1),
             nn.Tanh(),
             nn.AvgPool2d(kernel_size=2),
-            nn.Dropout(p=0.4),
+            # nn.Dropout(p=0.4),
             nn.Conv2d(16, 120, kernel_size=5, stride=1),
             nn.Tanh()
         )

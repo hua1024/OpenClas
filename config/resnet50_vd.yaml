@@ -86,7 +86,6 @@ TEST:
   dataset:
     type: 'TXTReader'
     ann_file: "/zzf/data/split_catdog/valid.txt"
-    classes: ['dog','cat']
     pipeline:
       - type: Resize
         params:

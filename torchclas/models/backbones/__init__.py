@@ -3,8 +3,13 @@
 # @Auto   : zzf-jeff
 
 from .lenet import LeNet5
-
+from .resnet import ResNet
+from .resnet_vd import ResNetVd
+from .vgg import VGG
 
 __all__ = [
     'LeNet5',
+    'ResNet',
+    'ResNetVd',
+    'VGG'
 ]

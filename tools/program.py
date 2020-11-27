@@ -28,14 +28,14 @@ def set_random_seed(seed, deterministic=False):
         torch.backends.cudnn.benchmark = False
 
 
-def trainer(epoch, cfg, train_loader, model, optimizer, criterion, device):
+def trainer(train_loader, model, optimizer, criterion, device):
     model.train()
 
     t_loss = AverageMeter()
     t_acc = AverageMeter()
 
     for batch_index, data in enumerate(train_loader):
-        images = data['img']
+        images = data['image']
         labels = data['label']
         images = images.to(device)
         labels = labels.to(device)
@@ -53,18 +53,18 @@ def trainer(epoch, cfg, train_loader, model, optimizer, criterion, device):
     return t_loss.avg, t_acc.avg
 
 
-def evaler(epoch, cfg, valid_loader, model, criterion, device):
+def evaler(valid_loader, model, criterion, device,topk=(1,)):
     model.eval()
     v_loss = AverageMeter()
     v_acc = AverageMeter()
     for batch_index, data in enumerate(valid_loader):
-        images = data['img']
+        images = data['image']
         labels = data['label']
         images = images.to(device)
         labels = labels.to(device)
         outputs = model(images)
         loss = criterion(outputs, labels)
-        pred_1 = accuracy(outputs, labels, topk=(1,))[0]
+        pred_1 = accuracy(outputs, labels, topk=topk)[0]
         v_loss.update(loss.item(), images.size(0))
         v_acc.update(pred_1.item(), images.size(0))
     return v_loss.avg, v_acc.avg

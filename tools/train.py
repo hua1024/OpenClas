@@ -35,7 +35,6 @@ def main():
     cfg = config_load(args.config)
     set_random_seed(cfg['BASE']['seed'])
     output_dict = create_log_folder(cfg)
-
     tb_writer = None
     if cfg['BASE']['use_tensorboard']:
         tb_writer = create_tb(output_dict['tb_dir'])
@@ -47,6 +46,7 @@ def main():
     device = select_device(cfg['BASE']['gpu_id'], cfg['TRAIN']['batch_size'], logger)
 
     model = build_backbone(cfg['BACKBONES'])
+    print(model)
 
     trainer_dataset = build_dataset(cfg['TRAIN']['dataset'])
     valid_dataset = build_dataset(cfg['VALID']['dataset'])
@@ -69,32 +69,35 @@ def main():
 
     # 断点恢复训练加载权重
     if cfg['BASE']['resume']:
-        print("=> loading checkpoint '{}'".format(cfg['BASE']['resume_fire']))
-        assert os.path.isfile(cfg['BASE']['resume_fire']), 'Error : no checkpoint directory found.'
-        checkpoint = torch.load(cfg['BASE']['resume_fire'])
+        print("=> loading checkpoint '{}'".format(cfg['BASE']['resume_file']))
+        assert os.path.isfile(cfg['BASE']['resume_file']), 'Error : no checkpoint directory found.'
+        checkpoint = torch.load(cfg['BASE']['resume_file'])
         best_acc = checkpoint['best_acc']
         start_epoch = checkpoint['epoch']
         model.load_state_dict(checkpoint['state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer'])
 
     for epoch in range(start_epoch, cfg['BASE']['n_epoch']):
-        # 同步学习率
-        for _ in range(start_epoch):
-            lr_scheduler.step()
 
-        t_loss, t_acc = trainer(epoch, cfg, train_loader, model, optimizer, criterion, device)
+        t_loss, t_acc = trainer(train_loader, model, optimizer, criterion, device)
 
-        logger.info('epoch : {} |train loss : {} |train acc : {}'.format(epoch, t_loss, t_loss))
+        # Update learning rate
+        lr_scheduler.step()
+        logger.info('*' * 20)
+        logger.info('epoch : {} |train loss : {} |train acc : {} |lr : {}'.format(epoch, t_loss, t_acc,
+                                                                                  optimizer.state_dict()[
+                                                                                      'param_groups'][0]['lr']))
         if tb_writer is not None:
             tb_writer.add_scalar('Train/loss', t_loss, epoch)
             tb_writer.add_scalar('Train/acc', t_acc, epoch)
-        # 测试时，保存最好的权重
+        # Do valid and saving best weight
         if (epoch >= cfg['BASE']['start_val']):
-            v_loss, v_acc = evaler(epoch, cfg, valid_loader, model, criterion, device)
+            v_loss, v_acc = evaler(valid_loader, model, criterion, device)
             logger.info('epoch : {} |valid loss : {} |valid acc : {}'.format(epoch, v_loss, v_acc))
             if tb_writer is not None:
                 tb_writer.add_scalar('Valid/loss', v_loss, epoch)
                 tb_writer.add_scalar('Valid/acc', v_acc, epoch)
+
             if (float(v_acc) > best_acc):
                 best_acc = float(v_acc)
                 save_state = {
@@ -107,10 +110,10 @@ def main():
                 filename = 'bs_{}_best.pth'.format(str(cfg['TRAIN']['batch_size']))
                 save_checkpoints(save_state, output_dict['chs_dir'], filename)
 
-        # 每多少个epoch保存一次
-        if epoch % cfg['BASE']['save_epoch'] == 0:
+        # Every number epoch to save weight
+        if (epoch + 1) % cfg['BASE']['save_epoch'] == 0:
             save_state = {
-                'epoch': epoch + 1,
+                'epoch': (epoch + 1),
                 'state_dict': model.state_dict(),
                 'lr': optimizer.param_groups[0]['lr'],
                 'optimizer': optimizer.state_dict(),
@@ -121,6 +124,7 @@ def main():
 
     # out of swap
     torch.cuda.empty_cache() if torch.cuda.is_available() else None
+    tb_writer.close() if tb_writer is not None else None
 
 
 if __name__ == '__main__':

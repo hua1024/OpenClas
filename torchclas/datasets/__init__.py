@@ -6,10 +6,9 @@ from .base_dataset import BaseDataset
 
 from .builder import DATASETS, PIPELINES, build_dataloader, build_dataset
 
-from .cifar import CIFAR10
-from .reader import ReaderDogCat
+from .txt_reader import TXTReader
 
 __all__ = [
     'BaseDataset', 'DATASETS', 'PIPELINES', 'build_dataloader', 'build_dataset',
-    'CIFAR10', 'ReaderDogCat'
+    'TXTReader',
 ]
