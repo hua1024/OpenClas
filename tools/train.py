@@ -14,6 +14,7 @@ import copy
 import os
 import time
 import torch
+from torchsummary import summary
 
 from torchclas.models import (build_backbone, build_loss, build_optimizer, build_lr_scheduler)
 from torchclas.datasets import (build_dataloader, build_dataset)
@@ -46,7 +47,7 @@ def main():
     device = select_device(cfg['BASE']['gpu_id'], cfg['TRAIN']['batch_size'], logger)
 
     model = build_backbone(cfg['BACKBONES'])
-    print(model)
+
 
     trainer_dataset = build_dataset(cfg['TRAIN']['dataset'])
     valid_dataset = build_dataset(cfg['VALID']['dataset'])
@@ -63,6 +64,10 @@ def main():
 
     criterion = criterion.to(device)
     model = model.to(device)
+
+    # 打印网络结构
+    summary(model,input_size=(3,224,224))
+    print(model)
 
     best_acc = 0.0
     start_epoch = 0

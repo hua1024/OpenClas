@@ -81,11 +81,12 @@ VALID:
 
 TEST:
   batch_size: 1
-  num_workers: 0
+  num_workers: 4
   shuffle: False
   dataset:
     type: 'TXTReader'
     ann_file: "/zzf/data/split_catdog/valid.txt"
+    classes: ['dog','cat']
     pipeline:
       - type: Resize
         params:

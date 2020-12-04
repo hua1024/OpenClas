@@ -19,7 +19,7 @@ BASE:
 
 
 BACKBONES:
-  type: ResNetVd
+  type: ResNet
   in_channels: 3
   num_classes: 2
   depth: 50

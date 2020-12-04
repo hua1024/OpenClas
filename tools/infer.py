@@ -30,7 +30,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Train image classifiers model')
     parser.add_argument('--config', type=str, help='train config file path', default='config/resnet50.yaml')
     parser.add_argument('--source', type=str, help='inference img path')
-    parser.add_argument('--weights', type=str, help='inference img path')
+    parser.add_argument('--weights', type=str, help='the model weights')
     args = parser.parse_args()
     return args
 
@@ -47,7 +47,7 @@ def main():
     model.load_state_dict(torch.load(args.weights, map_location=device)['state_dict'])
 
     model = model.to(device)
-
+    model.eval()
     normalize_imgnet = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                             std=[0.229, 0.224, 0.225])
     trans = transforms.Compose([
@@ -59,13 +59,15 @@ def main():
     img = trans(img)
     img = img.to(device)
     img = img.unsqueeze(0)
-    output = model(img)
+    with torch.no_grad():
+        output = model(img)
     #
+    # print(output)
     prob = F.softmax(output, dim=1)
     value, predicted = torch.max(output.data, 1)
     pred_class = cfg['TEST']['dataset']['classes'][predicted.item()]
     pred_score = prob[0][predicted.item()].item()
-    print(pred_class,pred_score)
+    print(pred_class, pred_score)
     # print('输入图片为 ：{}'.format(args.source))
     # print('预测的结果为 : {}, 准确率为 : {}'.format(pred_class, str(pred_score)))
 
