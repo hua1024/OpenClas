@@ -59,10 +59,16 @@ def main():
     img = trans(img)
     img = img.to(device)
     img = img.unsqueeze(0)
-    with torch.no_grad():
-        output = model(img)
-    #
-    # print(output)
+
+    start_time = time.time()
+    for _ in range(100):
+        with torch.no_grad():
+            output = model(img)
+    end_time = time.time()
+    print(end_time - start_time)
+
+
+
     prob = F.softmax(output, dim=1)
     value, predicted = torch.max(output.data, 1)
     pred_class = cfg['TEST']['dataset']['classes'][predicted.item()]

@@ -4,7 +4,9 @@
 
 import sys
 import os
+
 sys.path.append('./')
+os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 
 import onnx
 import torch
@@ -24,7 +26,7 @@ def parse_args():
 
 
 def _torch2onnx(model, dummy_input, onnx_model_name, input_names, output_names, opset_version=9,
-                do_constant_folding=False, verbose=False, is_dynamic=False):
+                do_constant_folding=False, verbose=False, is_dynamic=True):
     """convert PyTorch model to Onnx
     Args:
         model (torch.nn.Module): PyTorch model.
@@ -43,7 +45,8 @@ def _torch2onnx(model, dummy_input, onnx_model_name, input_names, output_names, 
     # dynamic_axes = {"input": {0: "batch_size"},  # 批处理变量
     #                 "output": {0: "batch_size"}}
     if is_dynamic:
-        dynamic_axes = {name: [0] for name in input_names + output_names}
+        # 批处理变量
+        dynamic_axes = {"input": {0: "batch_size"}, "output": {0: "batch_size"}}
     else:
         dynamic_axes = None
 
@@ -66,11 +69,11 @@ def main():
     model = build_backbone(cfg['BACKBONES'])
     model.load_state_dict(torch.load(args.weights, map_location=device)['state_dict'])
     model = model.to(device)
-    input_data = torch.randn(1, 3, 224, 224).to(device)
+    input_data = torch.randn(4, 3, 224, 224).to(device)
     model.eval()
     output = args.output
     _torch2onnx(model=model, dummy_input=input_data, onnx_model_name=output, input_names=['input'],
-                output_names=['output'], opset_version=11)
+                output_names=['output'], opset_version=9)
     onnx_model = onnx.load(output)
     # check that the model converted fine
     onnx.checker.check_model(onnx_model)

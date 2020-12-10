@@ -5,16 +5,16 @@
 ## 更新日志
 
 - 框架训练测试推理测试通过 2020.11.30
-
+- TensorRT加速测试通过 2020.12.10
 
 
 ## todo list
-- [x] VGG、Resnet、DenseNet网络的支持
-- [ ] imagenet训练结果
+- [x] VGG、Resnet、DenseNet、Resnet-vd网络的支持
+- [ ] cifar10训练结果
 - [ ] 分布式训练支持
 - [ ] 可视化特征输出
 - [ ] 轻量级网络的支持(MoblieNet、...)
-- [ ] TensorRT加速
+- [x] TensorRT加速
 - [ ] 模型剪枝
 - [ ] 模型量化
 - [ ] 模型蒸馏
