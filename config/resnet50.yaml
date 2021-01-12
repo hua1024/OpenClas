@@ -46,7 +46,7 @@ TRAIN:
   shuffle: True
   dataset:
     type: 'TXTReader'
-    ann_file: "/media/chen3/zzf/data/classify_data/cat_dog/training/train.txt"
+    ann_file: "/media/newData/user/zzf/data/classify_data/cat_dog/training/valid.txt"
     classes: ['dog','cat']
     pipeline:
       - type: Resize
@@ -67,7 +67,7 @@ VALID:
   shuffle: False
   dataset:
     type: 'TXTReader'
-    ann_file: "/media/chen3/zzf/data/classify_data/cat_dog/training/valid.txt"
+    ann_file: "/media/newData/user/zzf/data/classify_data/cat_dog/training/valid.txt"
     classes: ['dog','cat']
     pipeline:
       - type: Resize
@@ -85,7 +85,7 @@ TEST:
   shuffle: False
   dataset:
     type: 'TXTReader'
-    ann_file: "/media/chen3/zzf/data/classify_data/cat_dog/training/valid.txt"
+    ann_file: "/media/newData/user/zzf/data/classify_data/cat_dog/training/valid.txt"
     classes: ['dog','cat']
     pipeline:
       - type: Resize

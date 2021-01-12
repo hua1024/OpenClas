@@ -1,0 +1,99 @@
+BASE:
+  gpu_id: '1'
+  algorithm: Clas
+  dataset_name: DogCat
+  resume: False
+  resume_file: 'checkpoints/DogCat/Clas/ResNet/weights/bs_32_eps_40.pth'
+  seed: 999
+  n_epoch: 50
+  init_lr: 0.01
+  start_val: 0
+  show_step: 20
+  checkpoints: ./checkpoints
+  save_epoch: 10
+  pretrained_model: ""
+  use_mix: False
+  use_apex: False
+  use_tensorboard: True
+
+
+
+BACKBONES:
+  type: InceptionV3
+  in_channels: 3
+  num_classes: 2
+
+
+LR_SCHEDULER:
+  type: 'StepLR'
+  params:
+    step_size: 30
+    gamma: 0.1
+
+OPTIMIZER:
+  type: 'SGDDecay'
+  params:
+    momentum: 0.9
+    weight_decay: 0.0001
+
+LOSS:
+  type: 'CrossEntropyLoss'
+
+
+TRAIN:
+  batch_size: 32
+  num_workers: 4
+  shuffle: True
+  dataset:
+    type: 'TXTReader'
+    ann_file: "/zzf/data/split_catdog/valid.txt"
+    classes: ['dog','cat']
+    pipeline:
+      - type: Resize
+        params:
+          size: [300,300]
+      - type: CenterCrop
+        params:
+          size: [299,299]
+      - type: ToTensor
+      - type: Normalize
+        params:
+          mean: [0.485, 0.456, 0.406]
+          std: [0.229, 0.224, 0.225]
+
+VALID:
+  batch_size: 32
+  num_workers: 4
+  shuffle: False
+  dataset:
+    type: 'TXTReader'
+    ann_file: "/zzf/data/split_catdog/valid.txt"
+    classes: ['dog','cat']
+    pipeline:
+      - type: Resize
+        params:
+          size: [299,299]
+      - type: ToTensor
+      - type: Normalize
+        params:
+          mean: [0.485, 0.456, 0.406]
+          std: [0.229, 0.224, 0.225]
+
+TEST:
+  batch_size: 1
+  num_workers: 0
+  shuffle: False
+  dataset:
+    type: 'TXTReader'
+    ann_file: "/zzf/data/split_catdog/valid.txt"
+    classes: ['dog','cat']
+    pipeline:
+      - type: Resize
+        params:
+          size: [229,229]
+      - type: ToTensor
+      - type: Normalize
+        params:
+          mean: [0.485, 0.456, 0.406]
+          std: [0.229, 0.224, 0.225]
+

@@ -74,7 +74,7 @@ class DenseNet(BaseBackbone):
 
     def __init__(self, depth, in_channels, reduction=0.5, bn_size=4, drop_rate=0, num_classes=1000):
         super(DenseNet, self).__init__()
-        (self.growth_rate, self.num_block) = DenseNet.arch_settings[depth]
+        (self.growth_rate, self.num_block) = self.arch_settings[depth]
 
         inner_channels = 2 * self.growth_rate
 

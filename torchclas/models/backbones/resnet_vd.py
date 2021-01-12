@@ -88,9 +88,9 @@ class BasicBlock(nn.Module):
 
         self.conv1 = ConvBnRelu(in_channels=in_channels, out_channels=out_channels, kernel_size=3, stride=stride,
                                 padding=1, is_relu=True)
-        self.conv2 = ConvBnRelu(in_channels=out_channels, out_channels=out_channels * BasicBlock.expansion,
+        self.conv2 = ConvBnRelu(in_channels=out_channels, out_channels=out_channels * self.expansion,
                                 kernel_size=3, padding=1, stride=1, is_relu=False)
-        self.shortcut = ShortCut(in_channels=in_channels, out_channels=out_channels * BasicBlock.expansion,
+        self.shortcut = ShortCut(in_channels=in_channels, out_channels=out_channels * self.expansion,
                                  stride=stride, is_first=is_first)
         self.relu = nn.ReLU()
 
@@ -113,9 +113,9 @@ class BottleneckBlock(nn.Module):
                                 padding=0, is_relu=True)
         self.conv2 = ConvBnRelu(in_channels=out_channels, out_channels=out_channels, kernel_size=3, stride=stride,
                                 padding=1, is_relu=True)
-        self.conv3 = ConvBnRelu(in_channels=out_channels, out_channels=out_channels * BottleneckBlock.expansion,
+        self.conv3 = ConvBnRelu(in_channels=out_channels, out_channels=out_channels * self.expansion,
                                 kernel_size=1, stride=1, padding=0, is_relu=False)
-        self.shortcut = ShortCut(in_channels=in_channels, out_channels=out_channels * BottleneckBlock.expansion,
+        self.shortcut = ShortCut(in_channels=in_channels, out_channels=out_channels * self.expansion,
                                  stride=stride, is_first=is_first)
         self.relu = nn.ReLU()
 
@@ -142,8 +142,8 @@ class ResNetVd(BaseBackbone):
         super(ResNetVd, self).__init__()
         self.in_channels = 64
 
-        self.block = ResNetVd.arch_settings[depth][0]
-        self.num_block = ResNetVd.arch_settings[depth][1]
+        self.block = self.arch_settings[depth][0]
+        self.num_block = self.arch_settings[depth][1]
 
         if not is_3x3:
             self.conv1 = ConvBnRelu(in_channels=in_channels, out_channels=64, kernel_size=7, padding=3, stride=2,

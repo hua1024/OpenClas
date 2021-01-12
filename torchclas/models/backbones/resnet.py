@@ -20,10 +20,6 @@ import torch.nn as nn
 from ..builder import BACKBONES
 from .base_backbone import BaseBackbone
 
-__all__ = [
-    "ResNet"
-]
-
 
 # conv+bn+relu
 class ConvBnRelu(nn.Module):
@@ -73,9 +69,9 @@ class BasicBlock(nn.Module):
 
         self.conv1 = ConvBnRelu(in_channels=in_channels, out_channels=out_channels, kernel_size=3, stride=stride,
                                 padding=1, is_relu=True)
-        self.conv2 = ConvBnRelu(in_channels=out_channels, out_channels=out_channels * BasicBlock.expansion,
+        self.conv2 = ConvBnRelu(in_channels=out_channels, out_channels=out_channels * self.expansion,
                                 kernel_size=3, padding=1, stride=1, is_relu=False)
-        self.shortcut = ShortCut(in_channels=in_channels, out_channels=out_channels * BasicBlock.expansion,
+        self.shortcut = ShortCut(in_channels=in_channels, out_channels=out_channels * self.expansion,
                                  stride=stride)
         self.relu = nn.ReLU()
 
@@ -98,9 +94,9 @@ class BottleneckBlock(nn.Module):
                                 padding=0, is_relu=True)
         self.conv2 = ConvBnRelu(in_channels=out_channels, out_channels=out_channels, kernel_size=3, stride=stride,
                                 padding=1, is_relu=True)
-        self.conv3 = ConvBnRelu(in_channels=out_channels, out_channels=out_channels * BottleneckBlock.expansion,
+        self.conv3 = ConvBnRelu(in_channels=out_channels, out_channels=out_channels * self.expansion,
                                 kernel_size=1, stride=1, padding=0, is_relu=False)
-        self.shortcut = ShortCut(in_channels=in_channels, out_channels=out_channels * BottleneckBlock.expansion,
+        self.shortcut = ShortCut(in_channels=in_channels, out_channels=out_channels * self.expansion,
                                  stride=stride)
         self.relu = nn.ReLU()
 
@@ -125,8 +121,8 @@ class ResNet(BaseBackbone):
     def __init__(self, depth, in_channels, num_classes=1000):
         super(ResNet, self).__init__()
         self.in_channels = 64
-        self.block = ResNet.arch_settings[depth][0]
-        self.num_block = ResNet.arch_settings[depth][1]
+        self.block = self.arch_settings[depth][0]
+        self.num_block = self.arch_settings[depth][1]
         # padding = 3 才能输出原论文的112
         self.conv1 = ConvBnRelu(in_channels=in_channels, out_channels=64, kernel_size=7, padding=3, stride=2,
                                 is_relu=True)

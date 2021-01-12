@@ -18,9 +18,9 @@ from tqdm import tqdm
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--source', type=str, default=r'/media/chen3/zzf/data/classify_data/cat_dog/train',
+    parser.add_argument('--source', type=str, default=r'/media/newData/user/zzf/data/classify_data/cat_dog/train',
                         help='The split image origin floder')
-    parser.add_argument('--output', type=str, default='/media/chen3/zzf/data/classify_data/cat_dog/training',
+    parser.add_argument('--output', type=str, default='/media/newData/user/zzf/data/classify_data/cat_dog/training',
                         help='The split image output floder')
     args = parser.parse_args()
     origin_img_path = args.source
