@@ -1,69 +1,120 @@
-# coding=utf-8  
+# coding=utf-8
 # @Time   : 2020/11/27 10:07
 # @Auto   : zzf-jeff
 
 import torch
 import torch.nn as nn
+
+from collections import OrderedDict
 from ..builder import BACKBONES
 import torch.nn.functional as F
 
 from .base_backbone import BaseBackbone
 from collections import OrderedDict
+import torch.utils.checkpoint as cp
 
 __all__ = [
     "CSPDenseNet"
 ]
 
 
-class _DenseLayer(nn.Sequential):
-    """Dense bottleneck
-    DenseNet网络的块结构，bn+relu+conv,1x1+3x3
+def _bn_function_factory(norm, relu, conv):
+    def bn_function(*inputs):
+        concated_features = torch.cat(inputs, 1)
+        bottleneck_output = conv(relu(norm(concated_features)))
+        return bottleneck_output
 
-    """
+    return bn_function
 
-    def __init__(self, in_channels, growth_rate, bn_size, drop_rate):
-        super(_DenseLayer, self).__init__()
-        inner_channels = growth_rate * bn_size
-        self.add_module('norm1', nn.BatchNorm2d(in_channels)),
-        self.add_module('relu1', nn.ReLU(inplace=True)),
-        self.add_module('conv1', nn.Conv2d(in_channels, inner_channels, kernel_size=1, stride=1, bias=False)),
-        self.add_module('norm2', nn.BatchNorm2d(bn_size * growth_rate)),
-        self.add_module('relu2', nn.ReLU(inplace=True)),
-        self.add_module('conv2', nn.Conv2d(inner_channels, growth_rate,
-                                           kernel_size=3, stride=1, padding=1, bias=False)),
-        self.drop_rate = drop_rate
 
-    def forward(self, x):
-        new_features = super(_DenseLayer, self).forward(x)
-        if self.drop_rate > 0:
-            new_features = F.dropout(new_features, p=self.drop_rate, training=self.training)
-        return torch.cat([x, new_features], 1)
+class _CSPTransition(torch.nn.Sequential):
+    def __init__(self, num_input_features, num_output_features):
+        super(_CSPTransition, self).__init__()
+        self.add_module('norm', torch.nn.BatchNorm2d(num_input_features))
+        self.add_module('relu', torch.nn.ReLU(inplace=True))
+        self.add_module('conv', torch.nn.Conv2d(num_input_features, num_output_features,
+                                                kernel_size=1, stride=1, bias=False))
 
 
 class _Transition(nn.Sequential):
-    def __init__(self, in_channels, out_channels):
+    def __init__(self, num_input_features, num_output_features):
         super(_Transition, self).__init__()
-        self.add_module('norm', nn.BatchNorm2d(in_channels))
+        self.add_module('norm', nn.BatchNorm2d(num_input_features))
         self.add_module('relu', nn.ReLU(inplace=True))
-        self.add_module('conv', nn.Conv2d(in_channels, out_channels,
+        self.add_module('conv', nn.Conv2d(num_input_features, num_output_features,
                                           kernel_size=1, stride=1, bias=False))
         self.add_module('pool', nn.AvgPool2d(kernel_size=2, stride=2))
 
 
-class _DenseBlock(nn.Sequential):
-    def __init__(self, num_layers, in_channels, bn_size, growth_rate, drop_rate):
-        super(_DenseBlock, self).__init__()
-        for i in range(num_layers):
-            layer = _DenseLayer(in_channels + i * growth_rate, growth_rate, bn_size, drop_rate)
-            self.add_module('denselayer%d' % (i + 1), layer)
+class _DenseLayer(nn.Sequential):
+    def __init__(self, num_input_features, growth_rate, bn_size, drop_rate, memory_efficient=False):
+        super(_DenseLayer, self).__init__()
+        self.add_module('norm1', nn.BatchNorm2d(num_input_features)),
+        self.add_module('relu1', nn.ReLU(inplace=True)),
+        self.add_module('conv1', nn.Conv2d(num_input_features, bn_size *
+                                           growth_rate, kernel_size=1, stride=1,
+                                           bias=False)),
+        self.add_module('norm2', nn.BatchNorm2d(bn_size * growth_rate)),
+        self.add_module('relu2', nn.ReLU(inplace=True)),
+        self.add_module('conv2', nn.Conv2d(bn_size * growth_rate, growth_rate,
+                                           kernel_size=3, stride=1, padding=1,
+                                           bias=False)),
+        self.drop_rate = drop_rate
+        self.memory_efficient = memory_efficient
 
-class _CSPDenseBlock(nn.Sequential):
-    def __init__(self, num_layers, in_channels, bn_size, growth_rate, drop_rate):
+    def forward(self, *prev_features):
+        bn_function = _bn_function_factory(self.norm1, self.relu1, self.conv1)
+        if self.memory_efficient and any(prev_feature.requires_grad for prev_feature in prev_features):
+            bottleneck_output = cp.checkpoint(bn_function, *prev_features)
+        else:
+            bottleneck_output = bn_function(*prev_features)
+        new_features = self.conv2(self.relu2(self.norm2(bottleneck_output)))
+        if self.drop_rate > 0:
+            new_features = F.dropout(new_features, p=self.drop_rate,
+                                     training=self.training)
+        return new_features
+
+
+class _CSPDenseBlock(torch.nn.Module):
+    def __init__(self, num_layers, num_input_features, bn_size, growth_rate, drop_rate, memory_efficient=False,
+                 transition=False):
         super(_CSPDenseBlock, self).__init__()
+        # 两个part,part 比例为0.5 -->part1,part2
+        self.csp_num_features1 = num_input_features // 2
+        self.csp_num_features2 = num_input_features - self.csp_num_features1
+
+        # csp dense block 的transition in channels
+        trans_in_features = num_layers * growth_rate
+
         for i in range(num_layers):
-            layer = _DenseLayer(in_channels + i * growth_rate, growth_rate, bn_size, drop_rate)
+            # part2 -->densenet
+            layer = _DenseLayer(
+                self.csp_num_features2 + i * growth_rate,
+                growth_rate=growth_rate,
+                bn_size=bn_size,
+                drop_rate=drop_rate,
+                memory_efficient=memory_efficient,
+            )
             self.add_module('denselayer%d' % (i + 1), layer)
 
+        # 这里默认reduction=0.5
+        self.transition = _CSPTransition(trans_in_features, trans_in_features // 2) if transition else None
+
+    def forward(self, x):
+
+        features = [x[:, self.csp_num_features1:, ...]]
+        for name, layer in self.named_children():
+            if 'denselayer' in name:
+                new_feature = layer(*features)
+                features.append(new_feature)
+        dense = torch.cat(features[1:], 1)
+
+        if self.transition is not None:
+            dense = self.transition(dense)
+
+        # part1 is shortcut
+        # part2 = dense net + csp transition(without maxpool)
+        return torch.cat([x[:, :self.csp_num_features1, ...], dense], 1)
 
 
 @BACKBONES.register_module()
@@ -76,54 +127,70 @@ class CSPDenseNet(BaseBackbone):
         264: (32, [6, 12, 64, 48])
     }
 
-    def __init__(self, depth, in_channels, reduction=0.5, bn_size=4, drop_rate=0, part_ratio=0.5, num_classes=1000):
+    def __init__(self,
+                 depth,
+                 in_channels,
+                 num_classes=1000,
+                 reduction=0.5,
+                 transitionBlock=True,
+                 transitionDense=True,
+                 bn_size=4,
+                 drop_rate=0,
+                 memory_efficient=False):
+
         super(CSPDenseNet, self).__init__()
         (self.growth_rate, self.num_block) = self.arch_settings[depth]
 
-        inner_channels = 2 * self.growth_rate
+        num_init_features = 2 * self.growth_rate
 
-        # First convolution
-        self.features = nn.Sequential(OrderedDict([
-            ('conv0', nn.Conv2d(in_channels, inner_channels, kernel_size=7, stride=2, padding=3, bias=False)),
-            ('norm0', nn.BatchNorm2d(inner_channels)),
-            ('relu0', nn.ReLU(inplace=True)),
-            ('pool0', nn.MaxPool2d(kernel_size=3, stride=2, padding=1)),
+        self.features = torch.nn.Sequential(OrderedDict([
+            ('conv0', torch.nn.Conv2d(in_channels, num_init_features, kernel_size=7, stride=2,
+                                      padding=3, bias=False)),
+            ('norm0', torch.nn.BatchNorm2d(num_init_features)),
+            ('relu0', torch.nn.ReLU(inplace=True)),
+            ('pool0', torch.nn.MaxPool2d(kernel_size=3, stride=2, padding=1)),
         ]))
 
+        num_features = num_init_features
 
+        for i, num_layers in enumerate(self.num_block):
+            block = _CSPDenseBlock(
+                num_layers=num_layers,
+                num_input_features=num_features,
+                bn_size=bn_size,
+                growth_rate=self.growth_rate,
+                drop_rate=drop_rate,
+                memory_efficient=memory_efficient,
+                transition=transitionBlock
+            )
+            self.features.add_module('denseblock%d' % (i + 1), block)
 
-        # dense block
-        for idx, num_layers in enumerate(self.num_block):
-            block = _DenseBlock(num_layers=num_layers, in_channels=inner_channels,
-                                bn_size=bn_size, growth_rate=self.growth_rate, drop_rate=drop_rate)
+            # ** 因为denseblock 是bc结构，reduction=0.5 里面的transition做了一次//2的操作
+            # 外面的也同步channels
+            num_features = num_features // 2 + num_layers * self.growth_rate // 2
 
-            self.features.add_module('denseblock%d' % (idx + 1), block)
-            inner_channels += self.growth_rate * num_layers
+            if (i != len(self.num_block) - 1) and transitionDense:
+                num_output_features = int(reduction * num_features)
+                trans = _Transition(num_input_features=num_features, num_output_features=num_output_features)
+                self.features.add_module('transition%d' % (i + 1), trans)
+                num_features = num_output_features
 
-            if idx != len(self.num_block) - 1:
-                out_channels = int(reduction * inner_channels)  # int() will automatic floor the value
-                self.features.add_module('transition{}%d'.format(idx + 1), _Transition(inner_channels, out_channels))
-                inner_channels = out_channels
+        self.features.add_module('norm5', torch.nn.BatchNorm2d(num_features))
+        self.classifier = torch.nn.Linear(num_features, num_classes)
 
-                # Final batch norm
-        self.features.add_module('norm5', nn.BatchNorm2d(inner_channels))
-
-        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        self.classifier = nn.Linear(inner_channels, num_classes)
-
-        # Official init from torch repo.
         for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(m.weight)
-            elif isinstance(m, nn.BatchNorm2d):
-                nn.init.constant_(m.weight, 1)
-                nn.init.constant_(m.bias, 0)
-            elif isinstance(m, nn.Linear):
-                nn.init.constant_(m.bias, 0)
+            if isinstance(m, torch.nn.Conv2d):
+                torch.nn.init.kaiming_normal_(m.weight)
+            elif isinstance(m, torch.nn.BatchNorm2d):
+                torch.nn.init.constant_(m.weight, 1)
+                torch.nn.init.constant_(m.bias, 0)
+            elif isinstance(m, torch.nn.Linear):
+                torch.nn.init.constant_(m.bias, 0)
 
     def forward(self, x):
         features = self.features(x)
-        out = self.avgpool(features)
+        out = F.relu(features, inplace=True)
+        out = F.adaptive_avg_pool2d(out, (1, 1))
         out = torch.flatten(out, 1)
         out = self.classifier(out)
         return out

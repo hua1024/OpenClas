@@ -76,34 +76,42 @@ class DenseNet(BaseBackbone):
         super(DenseNet, self).__init__()
         (self.growth_rate, self.num_block) = self.arch_settings[depth]
 
-        inner_channels = 2 * self.growth_rate
+        num_init_features = 2 * self.growth_rate
 
         # First convolution
         self.features = nn.Sequential(OrderedDict([
-            ('conv0', nn.Conv2d(in_channels, inner_channels, kernel_size=7, stride=2, padding=3, bias=False)),
-            ('norm0', nn.BatchNorm2d(inner_channels)),
+            ('conv0', nn.Conv2d(in_channels, num_init_features, kernel_size=7, stride=2, padding=3, bias=False)),
+            ('norm0', nn.BatchNorm2d(num_init_features)),
             ('relu0', nn.ReLU(inplace=True)),
             ('pool0', nn.MaxPool2d(kernel_size=3, stride=2, padding=1)),
         ]))
 
+        num_features = num_init_features
+
         # dense block
         for idx, num_layers in enumerate(self.num_block):
-            block = _DenseBlock(num_layers=num_layers, in_channels=inner_channels,
-                                bn_size=bn_size, growth_rate=self.growth_rate, drop_rate=drop_rate)
+            block = _DenseBlock(
+                num_layers=num_layers,
+                in_channels=num_features,
+                bn_size=bn_size,
+                growth_rate=self.growth_rate,
+                drop_rate=drop_rate
+            )
 
             self.features.add_module('denseblock%d' % (idx + 1), block)
-            inner_channels += self.growth_rate * num_layers
+
+            num_features = self.growth_rate * num_layers + num_features
 
             if idx != len(self.num_block) - 1:
-                out_channels = int(reduction * inner_channels)  # int() will automatic floor the value
-                self.features.add_module('transition{}%d'.format(idx + 1), _Transition(inner_channels, out_channels))
-                inner_channels = out_channels
+                out_channels = int(reduction * num_features)  # int() will automatic floor the value
+                self.features.add_module('transition{}%d'.format(idx + 1), _Transition(num_features, out_channels))
+                num_features = out_channels
 
                 # Final batch norm
-        self.features.add_module('norm5', nn.BatchNorm2d(inner_channels))
+        self.features.add_module('norm5', nn.BatchNorm2d(num_features))
 
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        self.classifier = nn.Linear(inner_channels, num_classes)
+        self.classifier = nn.Linear(num_features, num_classes)
 
         # Official init from torch repo.
         for m in self.modules():

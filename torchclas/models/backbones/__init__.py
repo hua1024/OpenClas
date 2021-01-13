@@ -17,6 +17,7 @@ from .inceptionv3 import InceptionV3
 from .inceptionv4 import InceptionV4
 from .resnet_inception_v2 import InceptionResNetV2
 from .senet import SeResNet
+from .csp_densenet import CSPDenseNet
 
 __all__ = [
     'LeNet5',
@@ -32,5 +33,6 @@ __all__ = [
     'ShuffleNetV2',
     'InceptionV3',
     'InceptionV4',
-    'InceptionResNetV2'
+    'InceptionResNetV2',
+    'CSPDenseNet'
 ]
