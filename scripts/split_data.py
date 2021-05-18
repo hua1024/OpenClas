@@ -9,7 +9,6 @@ import sys
 import argparse
 from tqdm import tqdm
 
-# sys.path.append("..")
 
 '''
 针对kaggle的猫狗分类写的数据随机分割
@@ -18,10 +17,10 @@ from tqdm import tqdm
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--source', type=str, default=r'/media/newData/user/zzf/data/classify_data/cat_dog/train',
-                        help='The split image origin floder')
-    parser.add_argument('--output', type=str, default='/media/newData/user/zzf/data/classify_data/cat_dog/training',
-                        help='The split image output floder')
+    parser.add_argument('--source', type=str, default=r'./data/classify_data/cat_dog/train',
+                        help='The split image origin ')
+    parser.add_argument('--output', type=str, default='./data/classify_data/cat_dog/training',
+                        help='The split image output ')
     args = parser.parse_args()
     origin_img_path = args.source
     result_img_path = args.output

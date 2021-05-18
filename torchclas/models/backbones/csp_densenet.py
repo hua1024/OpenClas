@@ -2,6 +2,15 @@
 # @Time   : 2020/11/27 10:07
 # @Auto   : zzf-jeff
 
+'''
+    处理了stand和fusion-last的写法,没想到如何兼容fusion-first
+         transitionBlock=True,
+         transitionDense=True, 为 stand
+
+         transitionBlock=False,
+         transitionDense=True, 为 fusion-last
+'''
+
 import torch
 import torch.nn as nn
 
@@ -82,10 +91,8 @@ class _CSPDenseBlock(torch.nn.Module):
         # 两个part,part 比例为0.5 -->part1,part2
         self.csp_num_features1 = num_input_features // 2
         self.csp_num_features2 = num_input_features - self.csp_num_features1
-
         # csp dense block 的transition in channels
-        trans_in_features = num_layers * growth_rate
-
+        trans_in_features = num_layers * growth_rate + self.csp_num_features2
         for i in range(num_layers):
             # part2 -->densenet
             layer = _DenseLayer(
@@ -98,23 +105,22 @@ class _CSPDenseBlock(torch.nn.Module):
             self.add_module('denselayer%d' % (i + 1), layer)
 
         # 这里默认reduction=0.5
-        self.transition = _CSPTransition(trans_in_features, trans_in_features // 2) if transition else None
+        self.transition = _CSPTransition(trans_in_features, trans_in_features) if transition else None
 
     def forward(self, x):
 
-        features = [x[:, self.csp_num_features1:, ...]]
+        features = [x[:, self.csp_num_features1:, :, :]]
         for name, layer in self.named_children():
             if 'denselayer' in name:
                 new_feature = layer(*features)
                 features.append(new_feature)
-        dense = torch.cat(features[1:], 1)
 
+        dense = torch.cat(features, 1)
         if self.transition is not None:
             dense = self.transition(dense)
-
         # part1 is shortcut
         # part2 = dense net + csp transition(without maxpool)
-        return torch.cat([x[:, :self.csp_num_features1, ...], dense], 1)
+        return torch.cat([x[:, :self.csp_num_features1, :, :], dense], 1)
 
 
 @BACKBONES.register_module()
@@ -167,7 +173,7 @@ class CSPDenseNet(BaseBackbone):
 
             # ** 因为denseblock 是bc结构，reduction=0.5 里面的transition做了一次//2的操作
             # 外面的也同步channels
-            num_features = num_features // 2 + num_layers * self.growth_rate // 2
+            num_features = self.growth_rate * num_layers + num_features
 
             if (i != len(self.num_block) - 1) and transitionDense:
                 num_output_features = int(reduction * num_features)

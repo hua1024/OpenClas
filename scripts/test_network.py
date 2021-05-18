@@ -8,7 +8,7 @@ sys.path.append('./')
 
 
 # import torch.nn as nn
-# from torchclas.models import build_backbone
+from torchclas.models import build_backbone
 # from torchclas.models import build_loss
 # from torchclas.models import build_optimizer
 # from torchclas.models import build_lr_scheduler
@@ -46,7 +46,21 @@ sys.path.append('./')
 #                                                                     'std': [0.229, 0.224, 0.225]})]
 # )
 #
-# model = build_backbone(cfg_model)
+import torch
+from torchclas.utils.io_func import (config_load, create_log_folder, create_tb)
+from torchsummary import summary
+
+device = torch.device('cuda:0')
+
+cfg = config_load('config/csp_densenet_121.yaml')
+model = build_backbone(cfg['BACKBONES']).to(device)
+# print(model)
+
+input = torch.randn(1,3,224,224).to(device)
+# summary(model, input_size=(3, 224, 224))
+
+out = model(input)
+
 # criterion = build_loss(cfg_loss)
 # optimizer = build_optimizer(cfg_optimizer)(model,0.01)
 # lr_scheduler = build_lr_scheduler(cfg_lr)(optimizer)
@@ -55,6 +69,7 @@ sys.path.append('./')
 #
 # print(model)
 # print(criterion)
+
 # print(optimizer)
 # print(lr_scheduler)
 # print(dataset)
@@ -128,20 +143,20 @@ sys.path.append('./')
 # print(id(foo1), id(foo2))
 # print(foo1 is foo2)  # True
 
-class Solution(object):
-    def reverse(self, x):
-        if -10 < x < 10:
-            return x
-        str_x = str(x)
-        if str_x[0] != '-':
-            str_x = str_x[::-1]
-            x = int(str_x)
-        else:
-            str_x=str_x[1:][::-1]
-            x = int(str_x)
-            x = -x
-        return x if -2147483648<x<2147483647 else 0
-
-s = Solution()
-print(s.reverse(-132))
-
+# class Solution(object):
+#     def reverse(self, x):
+#         if -10 < x < 10:
+#             return x
+#         str_x = str(x)
+#         if str_x[0] != '-':
+#             str_x = str_x[::-1]
+#             x = int(str_x)
+#         else:
+#             str_x=str_x[1:][::-1]
+#             x = int(str_x)
+#             x = -x
+#         return x if -2147483648<x<2147483647 else 0
+#
+# s = Solution()
+# print(s.reverse(-132))
+#

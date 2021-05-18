@@ -46,7 +46,7 @@ TRAIN:
   shuffle: True
   dataset:
     type: 'TXTReader'
-    ann_file: "/zzf/data/split_catdog/train.txt"
+    ann_file: "/zzf/data/split_catdog/valid.txt"
     classes: ['dog','cat']
     pipeline:
       - type: Resize

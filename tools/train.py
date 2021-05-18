@@ -66,8 +66,8 @@ def main():
     model = model.to(device)
 
     # 打印网络结构
-    summary(model,input_size=(3,299,299))
-    print(model)
+    summary(model,input_size=(3,224,224))
+
 
     best_acc = 0.0
     start_epoch = 0

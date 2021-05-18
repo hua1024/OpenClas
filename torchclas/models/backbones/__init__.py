@@ -18,6 +18,7 @@ from .inceptionv4 import InceptionV4
 from .resnet_inception_v2 import InceptionResNetV2
 from .senet import SeResNet
 from .csp_densenet import CSPDenseNet
+from .vgg16_se import VGGSeNet
 
 __all__ = [
     'LeNet5',
@@ -34,5 +35,6 @@ __all__ = [
     'InceptionV3',
     'InceptionV4',
     'InceptionResNetV2',
-    'CSPDenseNet'
+    'CSPDenseNet',
+    'VGGSeNet'
 ]

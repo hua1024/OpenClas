@@ -23,21 +23,25 @@ class HSigmoid(nn.Module):
         return out
 
 
+
+
 class SEModule(nn.Module):
-    def __init__(self, in_channels, reduction=4):
+    def __init__(self, in_channels, reduction=16):
         super().__init__()
-        self.avg_pool = nn.AdaptiveAvgPool2d(1)
-        self.fc = nn.Sequential(
-            nn.Conv2d(in_channels, in_channels // reduction, kernel_size=1, bias=False),
-            nn.BatchNorm2d(in_channels // reduction),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(in_channels // reduction, in_channels, kernel_size=1, bias=False),
-            nn.BatchNorm2d(in_channels),
-            HSigmoid()
-        )
+        inner_channels = in_channels // reduction
+        self.pool = nn.AdaptiveAvgPool2d(1)
+        self.conv1 = nn.Conv2d(in_channels=in_channels, out_channels=inner_channels, kernel_size=1, bias=True)
+        self.relu1 = nn.ReLU()
+        self.conv2 = nn.Conv2d(in_channels=inner_channels, out_channels=in_channels, kernel_size=1, bias=True)
+        self.relu2 = HSigmoid()
 
     def forward(self, x):
-        return x * self.fc(x)
+        attn = self.pool(x)
+        attn = self.conv1(attn)
+        attn = self.relu1(attn)
+        attn = self.conv2(attn)
+        attn = self.relu2(attn)
+        return x * attn
 
 
 class Block(nn.Module):
@@ -95,9 +99,9 @@ class MobileNetV3(BaseBackbone):
                 Block(3, 80, 184, 80, linear=HSwish(), se_module=None, stride=1),
                 Block(3, 80, 480, 112, linear=HSwish(), se_module=SEModule(112), stride=1),
                 Block(3, 112, 672, 112, linear=HSwish(), se_module=SEModule(112), stride=1),
-                Block(3, 112, 672, 160, linear=HSwish(), se_module=SEModule(160), stride=1),
-                Block(3, 160, 672, 160, linear=HSwish(), se_module=SEModule(160), stride=2),
-                Block(3, 160, 960, 160, linear=HSwish(), se_module=SEModule(160), stride=1),
+                Block(5, 112, 672, 160, linear=HSwish(), se_module=SEModule(160), stride=1),
+                Block(5, 160, 672, 160, linear=HSwish(), se_module=SEModule(160), stride=2),
+                Block(5, 160, 960, 160, linear=HSwish(), se_module=SEModule(160), stride=1),
             )
             self.conv2 = nn.Conv2d(160, 960, kernel_size=1, bias=False)
             self.bn2 = nn.BatchNorm2d(960)
